@@ -16,7 +16,7 @@ variable "storage_account_name" {
   description = "Name of the storage account"
 }
 variable "keyvault_name" {
-  default     = muthukumarkvl123
+  default     = "muthukumarkvl123"
   type        = string
   description = "Name of the storage account"
 }
