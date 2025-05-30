@@ -18,9 +18,11 @@ variable "storage_account_name" {
 variable "keyvault_name" {
   default     = "muthukumarkvl123"
   type        = string
-  description = "Name of the storage account"
+  description = "Name of the keyvault account"
 }
-#variable "storage_account_container_name" {
-#  type        = string
-#  description = "Name of the container inside the storage account"
-#}
+
+variable "appinsight_name" {
+  default     = "appinsight123"
+  type        = string
+  description = "Name of the appinsight name"
+}
