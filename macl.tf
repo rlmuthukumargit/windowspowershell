@@ -9,7 +9,7 @@ resource "azurerm_machine_learning_workspace" "macl" {
   application_insights_id = azurerm_application_insights.appins.id
   key_vault_id            = azurerm_key_vault.mykeyvault.id
   location                = var.resource_group_location
-  name                    = "maclsvc123"
+  name                    = "maclsvc9881"
   resource_group_name     = var.resource_group_name
   storage_account_id      = azurerm_storage_account.muthustg.id
 

@@ -11,4 +11,4 @@ resource "azurerm_storage_share" "file_share" {
   name                     = "filesharedev"
   storage_account_id       = azurerm_storage_account.muthustg.id
   quota                    = 50
-}
+  }

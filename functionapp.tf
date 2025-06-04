@@ -1,5 +1,5 @@
 resource "azurerm_linux_function_app" "functionapp1" {
-  name                       = "fnappdev12"
+  name                       = "fnappdev9881"
   location                   = var.resource_group_location
   resource_group_name        = var.resource_group_name
   service_plan_id            = azurerm_service_plan.svcplan.id
@@ -22,7 +22,7 @@ resource "azurerm_linux_function_app" "functionapp1" {
 }
 
 resource "azurerm_linux_function_app" "functionapp2" {
-  name                       = "fnappdev13"
+  name                       = "fnappdev9882"
   location                   = var.resource_group_location
   resource_group_name        = var.resource_group_name
   service_plan_id            = azurerm_service_plan.svcplan.id
