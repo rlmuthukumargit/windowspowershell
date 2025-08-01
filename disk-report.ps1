@@ -1,7 +1,7 @@
 # ==== Configuration ====
 $serverList = Get-Content "C:\Reports\report.txt"
-$from = "rl.muthukumar@gmail.com"
-$to = "rl.muthukumar@gmail.com"
+$from = ""
+$to = ""
 $subject = "Daily Disk Report - $(Get-Date -Format 'yyyy-MM-dd')"
 $smtpServer = "smtp.gmail.com"
 $smtpPort = 587
