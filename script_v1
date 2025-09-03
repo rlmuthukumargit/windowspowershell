@@ -1,0 +1,108 @@
+# === Configuration ===
+$servers = @("server1", "server2", "server3")  # Replace with your server names or IPs
+$threshold = 80
+$timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+$reportFolder = "C:\Reports"
+$csvPath = Join-Path $reportFolder "DiskUsage_$timestamp.csv"
+$htmlPath = Join-Path $reportFolder "DiskUsage_$timestamp.html"
+
+# === Ensure folder exists ===
+if (!(Test-Path $reportFolder)) {
+    New-Item -ItemType Directory -Path $reportFolder -Force | Out-Null
+}
+
+# === Initialize Data ===
+$diskReport = @()
+
+foreach ($server in $servers) {
+    try {
+        $disks = Get-CimInstance -ComputerName $server -ClassName Win32_LogicalDisk -Filter "DriveType=3" -ErrorAction Stop
+
+        foreach ($disk in $disks) {
+            $sizeGB = [math]::Round($disk.Size / 1GB, 2)
+            $freeGB = [math]::Round($disk.FreeSpace / 1GB, 2)
+            $usedGB = [math]::Round(($disk.Size - $disk.FreeSpace) / 1GB, 2)
+            $usagePct = if ($disk.Size -ne 0) { [math]::Round((($disk.Size - $disk.FreeSpace) / $disk.Size) * 100, 2) } else { 0 }
+
+            $diskReport += [PSCustomObject]@{
+                Server     = $server
+                Drive      = $disk.DeviceID
+                'Size(GB)' = $sizeGB
+                'Free(GB)' = $freeGB
+                'Used(GB)' = $usedGB
+                'Usage(%)' = $usagePct
+            }
+        }
+    } catch {
+        $diskReport += [PSCustomObject]@{
+            Server     = $server
+            Drive      = "N/A"
+            'Size(GB)' = "N/A"
+            'Free(GB)' = "N/A"
+            'Used(GB)' = "N/A"
+            'Usage(%)' = "Failed to connect"
+        }
+    }
+}
+
+# === Save CSV ===
+$diskReport | Export-Csv -Path $csvPath -NoTypeInformation -Encoding UTF8
+
+# === Create color-coded HTML ===
+$htmlHeader = @"
+<html>
+<head>
+    <style>
+        table { border-collapse: collapse; width: 100%; font-family: Arial; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+        th { background-color: #4CAF50; color: white; }
+        tr.high { background-color: #f44336; color: white; }  /* > 80% red */
+        tr.medium { background-color: #ff9800; color: white; } /* 60–80% orange */
+        tr.low { background-color: #c8e6c9; }  /* < 60% green */
+    </style>
+</head>
+<body>
+<h2>Disk Usage Report - $timestamp</h2>
+<table>
+    <tr>
+        <th>Server</th>
+        <th>Drive</th>
+        <th>Size (GB)</th>
+        <th>Free (GB)</th>
+        <th>Used (GB)</th>
+        <th>Usage (%)</th>
+    </tr>
+"@
+
+$htmlBody = ""
+
+foreach ($entry in $diskReport) {
+    $usage = $entry.'Usage(%)'
+    $rowClass = "low"
+    if ($usage -eq "Failed to connect") {
+        $rowClass = "high"
+    } elseif ([double]::TryParse($usage, [ref]$null)) {
+        if ($usage -gt 80) { $rowClass = "high" }
+        elseif ($usage -gt 60) { $rowClass = "medium" }
+    }
+
+    $htmlBody += "<tr class='$rowClass'><td>$($entry.Server)</td><td>$($entry.Drive)</td><td>$($entry.'Size(GB)')</td><td>$($entry.'Free(GB)')</td><td>$($entry.'Used(GB)')</td><td>$($entry.'Usage(%)')</td></tr>`n"
+}
+
+$htmlFooter = @"
+</table>
+</body>
+</html>
+"@
+
+$htmlContent = $htmlHeader + $htmlBody + $htmlFooter
+$htmlContent | Out-File -FilePath $htmlPath -Encoding UTF8
+
+# === Delete old reports (> 30 days) ===
+Get-ChildItem -Path $reportFolder -File | Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-30) } | Remove-Item -Force
+
+# === Output paths ===
+Write-Host "`n✅ Reports saved:"
+Write-Host "CSV : $csvPath"
+Write-Host "HTML: $htmlPath"
+Write-Host "🧹 Old reports cleaned (>30 days old)"
