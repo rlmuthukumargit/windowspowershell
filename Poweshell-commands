@@ -1,1 +1,30 @@
 Get-CimInstance -ClassName Win32_LogicalDisk -ComputerName "172.31.95.234" -Filter "DriveType=3" | Select-Object DeviceID, @{Name="Size(GB)";Expression={"{0:N2}" -f ($_.Size/1GB)}}, @{Name="FreeSpace(GB)";Expression={"{0:N2}" -f ($_.FreeSpace/1GB)}}
+
+
+
+
+Azure Function Dashboards
+
+Function invocation count
+
+Function latency
+
+Exceptions
+
+Cold start detection
+
+Queue message lag (if using Service Bus)
+
+Bot Dashboards
+
+User messages
+
+Bot replies
+
+Failure rate
+
+Channel usage (Teams, WebChat, Telegram)
+
+Conversation-level logs
+
+QnA/detector errors
