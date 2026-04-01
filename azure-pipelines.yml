@@ -1,0 +1,129 @@
+resources:
+  repositories:
+  - repository: other-repo
+    type: git
+    name: ProjectName/OtherRepoName # Replace with your actual project/repo name
+
+trigger: none
+
+pool:
+  name: GenericPoolLinux-ss
+
+parameters:
+  - name: AWS_SERVICE_CONNECTION
+    type: string
+    default: 'ws-038-testing'
+  - name: AWS_ROLE_NAME
+    type: string
+    default: 'WS-038U-role_AUTOMATION'
+  - name: AWS_REGION
+    type: string
+    default: 'us-east-1'
+
+stages:
+  - stage: Build_Spring_Boot
+    displayName: 'Build'
+    jobs:
+      - job: Build
+        displayName: 'Maven Build'
+        pool:
+          name: GenericPoolLinux-ss
+        steps:
+          - checkout: self
+          - checkout: other-repo
+          - task: Maven@3
+            displayName: 'Build JAR'
+            inputs:
+              mavenPomFile: 'demo-app/pom.xml'
+              goals: 'clean package'
+              publishJUnitResults: true
+              testResultsFiles: '**/surefire-reports/TEST-*.xml'
+              javaHomeOption: 'JDKVersion'
+              jdkVersionOption: '1.25'
+              mavenVersionOption: 'Default'
+              mavenAuthenticateFeed: false
+              effectivePomSkip: false
+              sonarQubeRunAnalysis: false
+
+          - bash: |
+              mkdir -p $(Build.ArtifactStagingDirectory)/eb-bundle/.platform/nginx/conf.d/
+              # Copy files from the demo-app folder
+              cp -r $(System.DefaultWorkingDirectory)/demo-app/.platform $(Build.ArtifactStagingDirectory)/eb-bundle/
+              cp $(System.DefaultWorkingDirectory)/demo-app/Procfile $(Build.ArtifactStagingDirectory)/eb-bundle/
+              cp $(System.DefaultWorkingDirectory)/demo-app/target/*.jar $(Build.ArtifactStagingDirectory)/eb-bundle/
+            displayName: 'Prepare Elastic Beanstalk Bundle'
+
+          - task: ArchiveFiles@2
+            displayName: 'Create ZIP Deployment Bundle'
+            inputs:
+              rootFolderOrFile: '$(Build.ArtifactStagingDirectory)/eb-bundle'
+              includeRootFolder: false
+              archiveType: 'zip'
+              archiveFile: '$(Build.ArtifactStagingDirectory)/deploy-bundle.zip'
+              replaceExistingArchive: true
+
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publish Artifact'
+            inputs:
+              PathtoPublish: '$(Build.ArtifactStagingDirectory)/deploy-bundle.zip'
+              ArtifactName: 'drop'
+              publishLocation: 'Container'
+
+          - task: BPAES.bp-aws.bp-aws-auth.awsTokenBroker@1
+            displayName: 'Login to AWS to Archive'
+            inputs:
+              serviceConnection: ${{ parameters.AWS_SERVICE_CONNECTION }}
+              roleName: ${{ parameters.AWS_ROLE_NAME }}
+              region: ${{ parameters.AWS_REGION }}
+
+          - bash: |
+              # Extract S3_BUCKET from dev.tfvars
+              S3_BUCKET=$(grep 's3_bucket' environments/dev/dev.tfvars | cut -d'=' -f2 | tr -d '" ' | xargs)
+              echo "Uploading to S3 Bucket: $S3_BUCKET"
+              aws s3 cp $(Build.ArtifactStagingDirectory)/deploy-bundle.zip s3://$S3_BUCKET/app/deploy-v$(Build.BuildId).zip
+            displayName: 'Upload to S3 Archive'
+
+  - stage: Terraform_Infrastructure
+    displayName: 'Infrastructure'
+    dependsOn: Build_Spring_Boot
+    jobs:
+      - job: Terraform_Job
+        displayName: 'Terraform Management'
+        pool:
+          name: GenericPoolLinux-ss
+        steps:
+          - checkout: self
+
+          - task: JasonBJohnson.azure-pipelines-tasks-terraform.azure-pipelines-tasks-terraform-installer.TerraformInstaller@0
+            displayName: 'Install Terraform'
+            inputs:
+              terraformVersion: 'latest'
+
+          - bash: |
+              if ! aws --version ; then
+                curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+                unzip -qq awscliv2.zip
+                sudo ./aws/install --update
+              fi
+            displayName: 'Install AWS CLI'
+
+          - task: BPAES.bp-aws.bp-aws-auth.awsTokenBroker@1
+            displayName: 'Login to AWS'
+            retryCountOnTaskFailure: 5
+            inputs:
+              serviceConnection: ${{ parameters.AWS_SERVICE_CONNECTION }}
+              roleName: ${{ parameters.AWS_ROLE_NAME }}
+              region: ${{ parameters.AWS_REGION }}
+
+          - bash: |
+              terraform init -backend-config="environments/dev/dev.backend"
+            displayName: 'Terraform Init'
+
+          - bash: |
+              terraform plan -var-file="environments/dev/dev.tfvars" -var="s3_key=app/deploy-v$(Build.BuildId).zip"
+            displayName: 'Terraform Plan'
+
+          - bash: |
+              terraform apply -var-file="environments/dev/dev.tfvars" -var="s3_key=app/deploy-v$(Build.BuildId).zip" -auto-approve
+            displayName: 'Terraform Apply'
+
