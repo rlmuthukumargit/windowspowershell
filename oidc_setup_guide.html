@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Master Guide: OIDC Setup for Azure Pipelines & AWS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --secondary: #1e1b4b;
+            --accent: #ec4899;
+            --bg: #f8fafc;
+            --fg: #0f172a;
+            --card-bg: #ffffff;
+            --border: #e2e8f0;
+            --code-bg: #1e293b;
+            --code-fg: #f8fafc;
+            --highlight: #fef08a;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #020617;
+                --fg: #f8fafc;
+                --card-bg: #1e293b;
+                --border: #334155;
+                --code-bg: #0f172a;
+                --code-fg: #cbd5e1;
+            }
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg);
+            color: var(--fg);
+            line-height: 1.6;
+            padding: 3rem 1.5rem;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        nav {
+            position: sticky;
+            top: 2rem;
+            float: right;
+            width: 250px;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            margin-left: 2rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+
+        @media (max-width: 800px) { nav { display: none; } }
+
+        nav ul { list-style: none; }
+        nav li { margin-bottom: 0.75rem; }
+        nav a { text-decoration: none; color: var(--fg); font-size: 0.9rem; font-weight: 500; transition: color 0.3s; }
+        nav a:hover { color: var(--primary); }
+
+        header { margin-bottom: 4rem; border-bottom: 1px solid var(--border); padding-bottom: 2rem; }
+        h1 { font-size: 3.5rem; font-weight: 800; letter-spacing: -0.05em; margin-bottom: 0.5rem; background: linear-gradient(135deg, var(--primary), var(--accent)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+        header p { font-size: 1.25rem; font-weight: 400; color: var(--fg); opacity: 0.7; }
+
+        section { margin-bottom: 4rem; scroll-margin-top: 2rem; }
+        h2 { font-size: 2.25rem; font-weight: 700; margin-bottom: 1.5rem; border-left: 6px solid var(--primary); padding-left: 1rem; }
+        h3 { font-size: 1.5rem; font-weight: 600; margin: 2rem 0 1rem; color: var(--primary); }
+
+        .card { background-color: var(--card-bg); border: 1px solid var(--border); border-radius: 1.25rem; padding: 2rem; margin-bottom: 2rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+        
+        .step { position: relative; padding-left: 3.5rem; margin-bottom: 2.5rem; }
+        .step-num { position: absolute; left: 0; width: 2.5rem; height: 2.5rem; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-weight: 700; box-shadow: 0 4px 6px -1px var(--primary); }
+
+        .code-container { position: relative; margin: 1.5rem 0; border-radius: 0.75rem; overflow: hidden; background: var(--code-bg); }
+        pre { font-family: 'JetBrains Mono', monospace; padding: 1.5rem; color: var(--code-fg); overflow-x: auto; font-size: 0.95rem; }
+        .copy-hint { position: absolute; top: 0.5rem; right: 0.5rem; font-size: 0.7rem; color: #94a3b8; }
+
+        .note { background: #fefce8; border-left: 4px solid #eab308; padding: 1rem 1.5rem; border-radius: 0.5rem; margin: 1.5rem 0; color: #854d0e; }
+        @media (prefers-color-scheme: dark) { .note { background: #1e1b1d; color: #facc15; border-color: #facc15; } }
+        
+        .badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 0.5rem; font-size: 0.75rem; font-weight: 700; margin-right: 0.5rem; }
+        .badge-aws { background: #ff9900; color: black; }
+        .badge-azure { background: #0078d4; color: white; }
+
+        footer { text-align: center; border-top: 1px solid var(--border); padding-top: 3rem; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <nav>
+        <ul>
+            <li><strong>Navigation</strong></li>
+            <li><a href="#prep">1. Preparation</a></li>
+            <li><a href="#standard">2. Direct OIDC Setup</a></li>
+            <li><a href="#broker">3. STS Token Broker (Native)</a></li>
+            <li><a href="#troubleshooting">4. Troubleshooting</a></li>
+            <li><a href="#security">5. Best Practices</a></li>
+        </ul>
+    </nav>
+
+    <header>
+        <h1>Master OIDC Setup Guide</h1>
+        <p>A Professional Roadmap for Azure DevOps and AWS Workload Identity Federation</p>
+    </header>
+
+    <section id="prep">
+        <h2>Phase 1: Preparation</h2>
+        <div class="card">
+            <p>Ensure you have the <strong>Organization ID</strong> from Azure DevOps Organization Settings > Overview.</p>
+            <p>Example ID: <code>7a5b6c7d...</code></p>
+        </div>
+    </section>
+
+    <section id="standard">
+        <span class="badge badge-azure">Azure</span> <span class="badge badge-aws">AWS</span>
+        <h2>Phase 2: Direct OIDC Setup (Concept 1)</h2>
+        <p>In this pattern, the Azure DevOps pipeline assumes the role directly.</p>
+
+        <div class="step">
+            <div class="step-num">1</div>
+            <div class="step-content">
+                <h3>Create Identity Provider</h3>
+                <p>1. Open <strong>IAM Console > Identity providers > Add provider</strong>.</p>
+                <p>2. Provider URL: <code>https://vstoken.dev.azure.com/{ORG_ID}</code></p>
+                <p>3. Audience: <code>api://AzureADTokenExchange</code></p>
+            </div>
+        </div>
+
+        <div class="step">
+            <div class="step-num">2</div>
+            <div class="step-content">
+                <h3>Create Target Role</h3>
+                <p>Create a Role with <strong>Web Identity</strong> trust relationship. Attach permissions required for the deployment.</p>
+                <div class="code-container"><pre>{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": { "Federated": "arn:aws:iam::123456789012:oidc-provider/vstoken.dev.azure.com/{ORG_ID}" },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": { "vstoken.dev.azure.com/{ORG_ID}:aud": "api://AzureADTokenExchange" }
+      }
+    }
+  ]
+}</pre></div>
+            </div>
+        </div>
+    </section>
+
+    <section id="broker">
+        <span class="badge badge-aws">Enterprise Pattern</span>
+        <h2>Phase 3: AWS STS Token Broker (Concept 2)</h2>
+        <p>The <strong>Token Broker</strong> pattern natively exchanges the OIDC identity for a secondary role via the <strong>Azure DevOps Service Connection UI</strong> (No PowerShell script required).</p>
+        
+        <div class="card">
+            <h3>Configuration: The Service Connection Broker</h3>
+            <p>This implementation allows you to separate the <strong>OIDC Identity Role</strong> (Role A) from the <strong>Deployment Task Role</strong> (Role B). Role A acts as the "identity broker" that assumes Role B.</p>
+            
+            <div class="step">
+                <div class="step-num">A</div>
+                <div class="step-content">
+                    <h3>Role B (Target) Trust Policy</h3>
+                    <p>Role B must trust Role A (the Role being assumed by the service connection).</p>
+                    <div class="code-container"><pre>{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": { "AWS": "arn:aws:iam::123456789012:role/FederationIdentityRole_A" },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}</pre></div>
+                </div>
+            </div>
+
+            <div class="step">
+                <div class="step-num">B</div>
+                <div class="step-content">
+                    <h3>Azure DevOps Service Connection UI Setup</h3>
+                    <p>1. <strong>Create Service Connection:</strong> Choose <strong>AWS</strong>.</p>
+                    <p>2. <strong>Authentication Method:</strong> Select <strong>Workload Identity Federation</strong>.</p>
+                    <p>3. <strong>Identity Provider Role (ARN):</strong> Enterprise-provided Role A ARN.</p>
+                    <p>4. <strong>Role to Assume (ARN):</strong> Target Deployment Role B ARN.</p>
+                    <p>5. <strong>Use OIDC:</strong> Ensure this checkbox is **Checked**.</p>
+                </div>
+            </div>
+            
+            <div class="note">The AWS Toolkit for Azure DevOps handles the dual-hop handshake (OIDC → STS → Target Role) entirely under the hood.</div>
+        </div>
+    </section>
+
+    <section id="troubleshooting">
+        <h2>Common Issues</h2>
+        <div class="card">
+            <h3>Credential Loading Failures</h3>
+            <p>Ensure the service connection is authorized for all pipelines. If Role B cannot be assumed by Role A, verify the <code>sts:AssumeRole</code> permission on Role A's inline policy.</p>
+        </div>
+    </section>
+
+    <footer>
+        <p>&copy; 2026 Antigravity | OIDC Core Series</p>
+    </footer>
+</body>
+</html>
