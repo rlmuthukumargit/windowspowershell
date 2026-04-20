@@ -1,0 +1,14 @@
+trigger:
+  branches:
+    include:
+      - adf_publish
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+- task: PublishBuildArtifacts@1
+  inputs:
+    PathtoPublish: '$(Build.SourcesDirectory)'
+    ArtifactName: 'adf_drop'
+    publishLocation: 'Container'
